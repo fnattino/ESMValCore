@@ -9,8 +9,14 @@ from ..common import ClFixHybridPressureCoord, OceanFixGrid
 from ..fix import Fix
 
 
-class Amon(Fix):
-    """Fixes for Amon variables."""
+Tos = OceanFixGrid
+
+
+Omon = OceanFixGrid
+
+
+class AllVars(Fix):
+    """Fixes for all vars."""
 
     def fix_metadata(self, cubes):
         """Fix parent time units.
@@ -28,7 +34,13 @@ class Amon(Fix):
 
         """
         for cube in cubes:
-            if cube.coords('time'):
+            if cube.attributes['table_id'] == 'Amon':
+                for coord in ['latitude', 'longitude']:
+                    cube_coord = cube.coord(coord)
+                    bounds = cube_coord.bounds
+                    if np.any(bounds[:-1, 1] != bounds[1:, 0]):
+                        cube_coord.bounds = None
+                        cube_coord.guess_bounds()
                 time = cube.coord('time')
                 if np.any(time.bounds[:-1, 1] != time.bounds[1:, 0]):
                     times = time.units.num2date(time.points)
@@ -53,12 +65,6 @@ Cli = ClFixHybridPressureCoord
 
 
 Clw = ClFixHybridPressureCoord
-
-
-Tos = OceanFixGrid
-
-
-Omon = OceanFixGrid
 
 
 class Sftlf(Fix):
