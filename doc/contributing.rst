@@ -42,7 +42,7 @@ request <https://github.blog/2019-02-14-introducing-draft-pull-requests/>`__
 early, as this will cause :ref:`CircleCI to run the unit tests <tests>`,
 :ref:`Codacy to analyse your code <code_quality>`, and
 :ref:`readthedocs to build the documentation <documentation>`.
-It’s also easier to get help from other developers if your code is visible in a
+It's also easier to get help from other developers if your code is visible in a
 pull request.
 
 :ref:`Make small pull requests <easy_review>`, the ideal pull requests changes
@@ -349,7 +349,7 @@ Whenever you make a pull request or push new commits to an existing pull
 request, readthedocs will automatically build the documentation.
 The link to the documentation will be shown in the list of checks below your
 pull request.
-Click 'Details' behind the check ``docs/readthedocs.org:esmvaltool`` to preview
+Click 'Details' behind the check ``docs/readthedocs.org:esmvalcore`` to preview
 the documentation.
 If all checks were successful, you may need to click 'Show all checks' to see
 the individual checks.
@@ -637,15 +637,6 @@ the following files:
 - ``environment.yml``
   contains development dependencies that cannot be installed from
   `PyPI <https://pypi.org/>`_
-- ``docs/requirements.txt``
-  contains Python dependencies needed to build the documentation that can be
-  installed from PyPI
-- ``docs/conf.py``
-  contains a list of Python dependencies needed to build the documentation that
-  cannot be installed from PyPI and need to be mocked when building the
-  documentation.
-  (We do not use conda to build the documentation because this is too time
-  consuming.)
 - ``setup.py``
   contains all Python dependencies, regardless of their installation source
 
@@ -717,18 +708,36 @@ Making a release
 
 The release manager makes the release, assisted by the release manager of the
 previous release, or if that person is not available, another previous release
-manager. Perform the steps listed below with two persons, to reduce the risk of
-error.
+manager.
+Perform the steps listed below with two persons, to reduce the risk of error.
+
+.. note::
+
+   The previous release manager ensures the current release manager has the
+   required administrative permissions to make the release.
+   Consider the following services:
+   `conda-forge <https://github.com/conda-forge/esmvalcore-feedstock>`__,
+   `DockerHub <https://hub.docker.com/orgs/esmvalgroup>`__,
+   `PyPI <https://pypi.org/project/ESMValCore/>`__, and
+   `readthedocs <https://readthedocs.org/dashboard/esmvalcore/users/>`__.
 
 To make a new release of the package, follow these steps:
 
-1. Check the tests on GitHub Actions and CircleCI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Check that all tests and builds work
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check the ``nightly``
-`build on CircleCI <https://circleci.com/gh/ESMValGroup/ESMValCore/tree/main>`__
-and the
-`GitHub Actions run <https://github.com/ESMValGroup/ESMValCore/actions>`__.
+- Check that the ``nightly``
+  `test run on CircleCI <https://circleci.com/gh/ESMValGroup/ESMValCore/tree/main>`__
+  was successful.
+- Check that the
+  `GitHub Actions test runs <https://github.com/ESMValGroup/ESMValCore/actions>`__
+  were successful.
+- Check that the documentation builds successfully on
+  `readthedocs <https://readthedocs.org/projects/esmvalcore/builds/>`__.
+- Check that the
+  `Docker images <https://hub.docker.com/repository/docker/esmvalgroup/esmvalcore/builds>`__
+  are building successfully.
+
 All tests should pass before making a release (branch).
 
 2. Create a release branch
@@ -743,9 +752,10 @@ to run their favourite recipe using this branch.
 3. Increase the version number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The version number is stored in ``esmvalcore/_version.py``, ``CITATION.cff``.
-Make sure to update both files.
-Also update the release date in ``CITATION.cff``.
+The version number is automatically generated from the information provided by
+git using [setuptools-scm](https://pypi.org/project/setuptools-scm/), but a
+static version number is stored in ``CITATION.cff``.
+Make sure to update the version number and release date in ``CITATION.cff``.
 See https://semver.org for more information on choosing a version number.
 Make a pull request and get it merged into ``main`` and cherry pick it into
 the release branch.
@@ -841,6 +851,64 @@ Make sure to use the `rc branch
 branch for your pull request and follow all instructions given by the linter
 bot.
 
+9. Check the Docker images
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two main Docker container images available for ESMValCore on
+`Dockerhub <https://hub.docker.com/r/esmvalgroup/esmvalcore/tags>`_:
+
+- ``esmvalgroup/esmvalcore:stable``, built from `docker/Dockerfile <https://github.com/ESMValGroup/ESMValCore/blob/main/docker/Dockerfile>`_,
+  this is a tag that is always the same as the latest released version.
+  This image is only built by Dockerhub when a new release is created.
+- ``esmvalgroup/esmvalcore:development``, built from `docker/Dockerfile.dev <https://github.com/ESMValGroup/ESMValCore/blob/main/docker/Dockerfile.dev>`_,
+  this is a tag that always contains the latest conda environment for
+  ESMValCore, including any test dependencies.
+  It is used by CircleCI_ to run the unit tests.
+  This speeds up running the tests, as it avoids the need to build the conda
+  environment for every test run.
+  This image is built by Dockerhub every time there is a new commit to the
+  ``main`` branch on Github.
+
+In addition to the two images mentioned above, there is an image available
+for every release (e.g. ``esmvalgroup/esmvalcore:v2.5.0``).
+When working on the Docker images, always try to follow the
+`best practices <https://docs.docker.com/develop/develop-images/dockerfile_best-practices/>`__.
+
+After making the release, check that the Docker image for that release has been
+built correctly by
+
+1. checking that the version tag is available on `Dockerhub`_ and the ``stable``
+   tag has been updated,
+2. running some recipes with the ``stable`` tag Docker container, for example one
+   recipe for Python, NCL, R, and Julia,
+3. running a recipe with a Singularity container built from the ``stable`` tag.
+
+If there is a problem with the automatically built container image, you can fix
+the problem and build a new image locally.
+For example, to
+`build <https://docs.docker.com/engine/reference/commandline/build/>`__ and
+`upload <https://docs.docker.com/engine/reference/commandline/push/>`__
+the container image for v2.5.0 of the tool run:
+
+.. code-block:: bash
+
+   git checkout v2.5.0
+   git clean -x
+   docker build -t esmvalgroup/esmvalcore:v2.5.0 . -f docker/Dockerfile
+   docker push esmvalgroup/esmvalcore:v2.5.0
+
+(when making updates, you may want to add .post0, .post1, .. to the version
+number to avoid overwriting an older tag) and if it is the latest release
+that you are updating, also run
+
+.. code-block:: bash
+
+   docker tag esmvalgroup/esmvalcore:v2.5.0 esmvalgroup/esmvalcore:stable
+   docker push esmvalgroup/esmvalcore:stable
+
+Note that the ``docker push`` command will overwrite the existing tags on
+Dockerhub, but the previous container image will remain available as an
+untagged image.
 
 .. _`@ESMValGroup/esmvaltool-coreteam`: https://github.com/orgs/ESMValGroup/teams/esmvaltool-coreteam
 .. _`@ESMValGroup/esmvaltool-developmentteam`: https://github.com/orgs/ESMValGroup/teams/esmvaltool-developmentteam
