@@ -1584,16 +1584,16 @@ def _clean_ancillaries(dataset: Dataset) -> None:
     ancillaries = []
     for _, duplicates in groupby(dataset.ancillaries,
                                  key=lambda ds: ds['short_name']):
-        duplicates = sorted(duplicates, key=match, reverse=True)
-        ancillary_ds = duplicates[0]
-        if len(duplicates) > 1:
+        group = sorted(duplicates, key=match, reverse=True)
+        ancillary_ds = group[0]
+        if len(group) > 1:
             logger.warning(
                 "For dataset %s: only using ancillary dataset %s, "
                 "ignoring duplicate ancillary datasets\n%s",
                 check._format_facets(dataset.facets),
                 check._format_facets(ancillary_ds.facets),
                 "\n".join(
-                    check._format_facets(ds.facets) for ds in duplicates[1:]),
+                    check._format_facets(ds.facets) for ds in group[1:]),
             )
         if any(_isglob(v) for v in ancillary_ds.facets.values()):
             logger.warning(

@@ -488,7 +488,7 @@ def test_from_files(session):
     )
     dataset.session = session
     dataset.files = [file1, file2, file3]
-    datasets = dataset.from_files()
+    datasets = list(dataset.from_files())
     expected = [
         Dataset(short_name='tas',
                 mip='Amon',
@@ -584,7 +584,7 @@ def test_from_files_with_ancillary(session):
         ensemble='r1i1p1f1',
     )
 
-    datasets = dataset.from_files()
+    datasets = list(dataset.from_files())
 
     assert all(ds.session == session for ds in datasets)
     assert all(ads.session == session for ds in datasets
@@ -672,7 +672,7 @@ def test_from_files_with_double_wildcards(mocker, session):
         new_callable=mocker.PropertyMock,
         side_effect=[[file], [afile]],
     )
-    datasets = dataset.from_files()
+    datasets = list(dataset.from_files())
 
     assert all(ds.session == session for ds in datasets)
     assert all(ads.session == session for ds in datasets
