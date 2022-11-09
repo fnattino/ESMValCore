@@ -2,6 +2,7 @@
 import abc
 import contextlib
 import datetime
+import importlib
 import logging
 import numbers
 import os
@@ -18,6 +19,8 @@ from pathlib import Path, PosixPath
 from shutil import which
 from typing import Dict, Type
 
+import dask
+import dask.distributed
 import psutil
 import yaml
 
@@ -711,18 +714,58 @@ class TaskSet(set):
                 independent_tasks.add(task)
         return independent_tasks
 
-    def run(self, max_parallel_tasks: int = None) -> None:
+    def run(self, cfg) -> None:
         """Run tasks.
 
         Parameters
         ----------
-        max_parallel_tasks : int
-            Number of processes to run. If `1`, run the tasks sequentially.
+        cfg : dict
+            Config-user dict.
         """
-        if max_parallel_tasks == 1:
+        max_parallel_tasks = cfg['max_parallel_tasks']
+        if max_parallel_tasks == -1:
+            self._run_dask(cfg)
+        elif max_parallel_tasks == 1:
             self._run_sequential()
         else:
             self._run_parallel(max_parallel_tasks)
+
+    def _run_dask(self, cfg) -> None:
+        """Run tasks using dask."""
+        # Configure dask
+        client_args = cfg.get('dask', {}).get('client', {})
+        cluster_args = cfg.get('dask', {}).get('cluster', {})
+        cluster_type = cluster_args.pop(
+            'type',
+            'dask.distributed.LocalCluster',
+        )
+        cluster_scale = cluster_args.pop('scale', 1)
+
+        # STart cluster
+        cluster_module_name, cluster_cls_name = cluster_type.rsplit('.', 1)
+        cluster_module = importlib.import_module(cluster_module_name)
+        cluster_cls = getattr(cluster_module, cluster_cls_name)
+        cluster = cluster_cls(**cluster_args)
+        cluster.scale(cluster_scale)
+
+        # Connect client and run computation
+        with dask.distributed.Client(cluster, **client_args) as client:
+            logger.info(f"Dask dashboard: {client.dashboard_link}")
+            for task in sorted(self.flatten(), key=lambda t: t.priority):
+                if hasattr(task, 'delayeds'):
+                    logger.info(f"Scheduling task {task.name}")
+                    task.run()
+                    logger.info(f"Computing task {task.name}")
+                    futures = client.compute(
+                        list(task.delayeds.values()),
+                        priority=-task.priority,
+                    )
+                    future_map = dict(zip(futures, task.delayeds.keys()))
+                else:
+                    logger.info(f"Skipping task {task.name}")
+            for future in dask.distributed.as_completed(futures):
+                filename = future_map[future]
+                logger.info(f"Wrote {filename}")
 
     def _run_sequential(self) -> None:
         """Run tasks sequentially."""

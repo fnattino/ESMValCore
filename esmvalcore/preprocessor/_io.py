@@ -10,6 +10,7 @@ import iris
 import iris.aux_factory
 import iris.exceptions
 import numpy as np
+import xarray
 import yaml
 from cf_units import suppress_errors
 
@@ -250,6 +251,7 @@ def save(cubes,
          filename,
          optimize_access='',
          compress=False,
+         compute=True,
          alias='',
          **kwargs):
     """Save iris cubes to file.
@@ -274,6 +276,10 @@ def save(cubes,
     compress: bool, optional
         Use NetCDF internal compression.
 
+    compute: bool, optional
+        If true save immediately, otherwise return a dask.delayed.Delayed
+        object that can be used for saving the data later.
+
     alias: str, optional
         Var name to use when saving instead of the one in the cube.
 
@@ -289,6 +295,8 @@ def save(cubes,
     """
     if not cubes:
         raise ValueError(f"Cannot save empty cubes '{cubes}'")
+    if len(cubes) > 1:
+        raise ValueError(f"`save` expects as single cube, got '{cubes}")
 
     # Rename some arguments
     kwargs['target'] = filename
@@ -333,9 +341,22 @@ def save(cubes,
             logger.debug('Changing var_name from %s to %s', cube.var_name,
                          alias)
             cube.var_name = alias
-    iris.save(cubes, **kwargs)
 
-    return filename
+    cube = cubes[0]
+    if compute is True:
+        iris.save(cube, **kwargs)
+        return filename
+
+    data_array = xarray.DataArray.from_iris(cube)
+    kwargs.pop('target')
+    kwargs['_FillValue'] = kwargs.pop('fill_value')
+    encoding = {cube.var_name: kwargs}
+    delayed = data_array.to_netcdf(
+        filename,
+        encoding=encoding,
+        compute=False,
+    )
+    return delayed
 
 
 def _get_debug_filename(filename, step):

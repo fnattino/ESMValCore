@@ -30,7 +30,7 @@ REQUIREMENTS = {
         'cartopy',
         # see https://github.com/SciTools/cf-units/issues/218
         'cf-units>=3.0.0,<3.1.0,!=3.0.1.post0',  # ESMValCore/issues/1655
-        'dask[array]',
+        'dask[array,distributed]',
         'esgf-pyclient>=0.3.1',
         'esmpy!=8.1.0',  # see github.com/ESMValGroup/ESMValCore/issues/1208
         'fiona',
@@ -55,6 +55,7 @@ REQUIREMENTS = {
         'scitools-iris>=3.2.1',
         'shapely[vectorized]',
         'stratify',
+        'xarray',
         'yamale',
     ],
     # Test dependencies

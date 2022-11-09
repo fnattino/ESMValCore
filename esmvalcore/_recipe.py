@@ -321,7 +321,8 @@ def _get_default_settings(variable, config_user, derive=False):
         }
 
     # Configure saving cubes to file
-    settings['save'] = {'compress': config_user['compress_netcdf']}
+    settings['save'] = {'compress': config_user['compress_netcdf'],
+                        'compute': config_user['max_parallel_tasks'] != -1}
     if variable['short_name'] != variable['original_short_name']:
         settings['save']['alias'] = variable['short_name']
 
@@ -712,6 +713,9 @@ def _get_downstream_settings(step, order, products):
         if key in remaining_steps:
             if all(p.settings.get(key, object()) == value for p in products):
                 settings[key] = value
+    save = dict(some_product.settings.get('save', {}))
+    save.pop('filename', None)
+    settings['save'] = save
     return settings
 
 
@@ -1918,7 +1922,7 @@ class Recipe:
         if not self._cfg['offline']:
             esgf.download(self._download_files, self._cfg['download_dir'])
 
-        self.tasks.run(max_parallel_tasks=self._cfg['max_parallel_tasks'])
+        self.tasks.run(self._cfg)
         self.write_html_summary()
 
     def get_output(self) -> dict:
